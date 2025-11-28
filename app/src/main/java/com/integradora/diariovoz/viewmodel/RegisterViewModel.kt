@@ -3,7 +3,7 @@ package com.integradora.diariovoz.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.integradora.diariovoz.data.AppDatabase
+import com.integradora.diariovoz.data.UserPreferences
 import com.integradora.diariovoz.data.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,21 +35,15 @@ class RegisterViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
 
-            val dao = AppDatabase.getDatabase(context).userDao()
+            val userPrefs = UserPreferences(context)
 
-            val exists = dao.getUserByEmail(email)
-            if (exists != null) {
-                sendMessage("El correo ya está registrado")
+            if (userPrefs.userExists(email) || userPrefs.userExists(name)) {
+                sendMessage("El correo o nombre ya está registrado")
+                _state.value = _state.value.copy(isLoading = false)
                 return@launch
             }
 
-            dao.insert(
-                User(
-                    name = name,
-                    email = email,
-                    password = pass
-                )
-            )
+            userPrefs.saveUser(name, email, pass)
 
             // Registro exitoso
             _state.value = RegisterState(

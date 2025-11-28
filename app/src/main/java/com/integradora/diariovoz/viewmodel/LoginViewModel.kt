@@ -3,7 +3,7 @@ package com.integradora.diariovoz.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.integradora.diariovoz.data.AppDatabase
+import com.integradora.diariovoz.data.UserPreferences
 import com.integradora.diariovoz.data.User
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,15 +58,14 @@ class LoginViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            val dao = AppDatabase.getDatabase(context).userDao()
+            val userPrefs = UserPreferences(context)
 
-            val exists = dao.getUserByEmail(nameOrEmail)
-            if (exists != null) {
+            if (userPrefs.userExists(nameOrEmail)) {
                 showMessage("El usuario ya existe.")
                 return@launch
             }
 
-            dao.insert(User(name = nameOrEmail, email = nameOrEmail, password = pass))
+            userPrefs.saveUser(nameOrEmail, nameOrEmail, pass)
 
             _state.value = _state.value.copy(registerSuccess = true)
             showMessage("Usuario registrado correctamente.")
@@ -89,8 +88,8 @@ class LoginViewModel : ViewModel() {
             _state.value = _state.value.copy(isLoading = true)
             delay(800)
 
-            val dao = AppDatabase.getDatabase(context).userDao()
-            val user = dao.getUserByEmail(name)
+            val userPrefs = UserPreferences(context)
+            val user = userPrefs.getUser(name)
 
             if (user != null && user.password == pass) {
                 showMessage("Inicio de sesión exitoso.")
