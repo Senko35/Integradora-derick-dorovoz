@@ -5,11 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.navigation.NavType
 import androidx.navigation.compose.*
-import androidx.navigation.navArgument
 import com.integradora.diariovoz.screens.*
-
 import com.integradora.diariovoz.theme.DiariovozTheme
 
 class MainActivity : ComponentActivity() {
@@ -27,10 +24,6 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = "login"
                     ) {
-
-                        // ================================
-                        // LOGIN
-                        // ================================
                         composable("login") {
                             LoginScreen(
                                 onRegistrarClick = {
@@ -43,10 +36,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-
-                        // ================================
-                        // REGISTER
-                        // ================================
                         composable("register") {
                             RegisterScreen(
                                 onRegistroExitoso = {
@@ -54,30 +43,20 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-
-                        // ================================
-                        // RECORD SCREEN (Pantalla 1)
-                        // ================================
                         composable("record") {
                             RecordScreen(
-                                onGoToSchedule = { audioPath ->
-                                    navController.navigate("schedule/$audioPath")
+                                onGoToSchedule = {
+                                    navController.navigate("audiolist")
+                                },
+                                onLogout = {
+                                    navController.navigate("login") {
+                                        popUpTo("record") { inclusive = true }
+                                    }
                                 }
                             )
                         }
-
-                        // ================================
-                        // SCHEDULE SCREEN (Pantalla 2)
-                        // ================================
-                        composable(
-                            route = "schedule/{audioPath}",
-                            arguments = listOf(
-                                navArgument("audioPath") { type = NavType.StringType }
-                            )
-                        ) { backStackEntry ->
-                            val audioPath = backStackEntry.arguments?.getString("audioPath") ?: ""
-
-                            ScheduleScreen(audioPath)
+                        composable("audiolist") {
+                            AudioListScreen(navController)   // 👈 AGREGADO
                         }
                     }
                 }

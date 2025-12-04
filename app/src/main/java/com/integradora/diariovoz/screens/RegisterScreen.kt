@@ -7,9 +7,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.integradora.diariovoz.theme.PinkDark
 import com.integradora.diariovoz.theme.PinkLight
+import com.integradora.diariovoz.ui.DoroButton
 import com.integradora.diariovoz.viewmodel.RegisterViewModel
 
 @Composable
@@ -20,6 +22,11 @@ fun RegisterScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
 
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var pass by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -27,12 +34,12 @@ fun RegisterScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        Text("Crear Cuenta", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "Crear Cuenta",
+            style = MaterialTheme.typography.titleLarge
+        )
 
         Spacer(modifier = Modifier.height(30.dp))
-
-        // NOMBRE
-        var name by remember { mutableStateOf("") }
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
@@ -45,9 +52,6 @@ fun RegisterScreen(
         )
 
         Spacer(modifier = Modifier.height(18.dp))
-
-        // EMAIL
-        var email by remember { mutableStateOf("") }
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -60,13 +64,11 @@ fun RegisterScreen(
         )
 
         Spacer(modifier = Modifier.height(18.dp))
-
-        // CONTRASEÑA
-        var pass by remember { mutableStateOf("") }
         OutlinedTextField(
             value = pass,
             onValueChange = { pass = it },
             label = { Text("Contraseña") },
+            visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = PinkDark,
@@ -75,13 +77,11 @@ fun RegisterScreen(
         )
 
         Spacer(modifier = Modifier.height(18.dp))
-
-        // CONFIRMAR CONTRASEÑA
-        var confirm by remember { mutableStateOf("") }
         OutlinedTextField(
             value = confirm,
             onValueChange = { confirm = it },
             label = { Text("Confirmar Contraseña") },
+            visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = PinkDark,
@@ -90,10 +90,11 @@ fun RegisterScreen(
         )
 
         Spacer(modifier = Modifier.height(28.dp))
-
-        // BOTÓN DE REGISTRO
-        Button(
-            onClick = {
+        DoroButton(
+            text = if (state.isLoading) "Creando cuenta..." else "Registrar",
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (!state.isLoading) {
                 viewModel.register(
                     context = context,
                     name = name,
@@ -101,28 +102,13 @@ fun RegisterScreen(
                     pass = pass,
                     confirm = confirm
                 )
-            },
-            enabled = !state.isLoading,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            if (state.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text("Registrar")
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        // MENSAJES DESDE EL VIEWMODEL
         state.message?.let { msg ->
             Text(msg, style = MaterialTheme.typography.bodyMedium)
         }
-
-        // NAVEGAR AL LOGIN CUANDO SUCCESS = TRUE
         LaunchedEffect(state.success) {
             if (state.success) {
                 onRegistroExitoso()

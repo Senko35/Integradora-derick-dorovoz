@@ -1,4 +1,5 @@
 package com.integradora.diariovoz.session
 
-class LoginSession {
+object LoginSession {
+    var currentUserEmail: String = ""
 }

@@ -2,86 +2,156 @@ package com.integradora.diariovoz.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.integradora.diariovoz.R
+import com.integradora.diariovoz.session.LoginSession
+import com.integradora.diariovoz.theme.PinkDark
+import com.integradora.diariovoz.theme.PinkLight
+import com.integradora.diariovoz.ui.DoroButton
 import com.integradora.diariovoz.viewmodel.AudioRecordViewModel
 import java.io.File
 
 @Composable
 fun RecordScreen(
     viewModel: AudioRecordViewModel = viewModel(),
-    onGoToSchedule: (String) -> Unit
+    onGoToSchedule: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
 
-    val outputDir = context.filesDir
-    val audioFile = remember {
-        File(outputDir, "audio_${System.currentTimeMillis()}.m4a")
+    var audioName by remember { mutableStateOf("") }
+    var hasPermission by remember {
+        mutableStateOf(
+            ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
     }
 
-    // Verificar permiso
-    val hasPermission = ActivityCompat.checkSelfPermission(
-        context,
-        Manifest.permission.RECORD_AUDIO
-    ) == PackageManager.PERMISSION_GRANTED
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasPermission = granted
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasPermission) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     if (!hasPermission) {
-        Text("La app necesita permiso para usar el micrófono.")
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text("Solicitando permiso para usar el micrófono...")
+        }
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(40.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
+    val audioFile = remember(audioName) {
+        File(
+            context.filesDir,
+            if (audioName.isBlank()) "audio_${System.currentTimeMillis()}.m4a"
+            else "$audioName.m4a"
+        )
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.doro),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            alpha = 0.18f
+        )
 
-        // -------------------------
-        // BOTÓN DE GRABACIÓN
-        // -------------------------
-        if (!state.isRecording) {
-            Button(
-                onClick = { viewModel.startRecording(audioFile) },
-                modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center // ⭐ CENTRADO
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("🎙️ Iniciar grabación")
+
+                DoroButton(
+                    text = " Mis grabaciones",
+                    modifier = Modifier.weight(1f)
+                ) { onGoToSchedule() }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                DoroButton(
+                    text = "Cerrar sesión",
+                    modifier = Modifier.weight(1f)
+                ) {
+                    LoginSession.currentUserEmail = ""
+                    onLogout()
+                }
             }
-        } else {
-            Button(
-                onClick = { viewModel.stopRecording() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("⏹️ Detener grabación")
+
+            Spacer(modifier = Modifier.height(40.dp))
+            if (!state.isRecording && state.filePath == null) {
+                OutlinedTextField(
+                    value = audioName,
+                    onValueChange = { audioName = it },
+                    label = { Text("Nombre del audio") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PinkDark,
+                        unfocusedBorderColor = PinkLight
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
             }
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        if (state.filePath != null && !state.isRecording) {
-            Text("Archivo guardado en:")
-            Text(state.filePath!!)
-        }
-
-        Spacer(modifier = Modifier.height(40.dp))
-
-        // -------------------------
-        // IR A SCHEDULE
-        // -------------------------
-        if (state.filePath != null && !state.isRecording) {
-            Button(
-                onClick = { onGoToSchedule(state.filePath!!) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("⏭️ Continuar a Agenda")
+            if (!state.isRecording) {
+                DoroButton(
+                    text = "🎙️ Iniciar grabación",
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (audioName.isNotBlank()) {
+                        viewModel.startRecording(audioFile)
+                    }
+                }
+            } else {
+                DoroButton(
+                    text = "⏹️ Detener grabación",
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    viewModel.stopRecording()
+                    val email = LoginSession.currentUserEmail
+                    viewModel.saveAudio(context, email)
+                }
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (state.audioSaved) {
+                Text("✔ Audio guardado", color = PinkDark)
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }

@@ -15,15 +15,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.integradora.diariovoz.R
-import com.integradora.diariovoz.viewmodel.LoginViewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.integradora.diariovoz.R
+import com.integradora.diariovoz.viewmodel.LoginViewModel
 import com.integradora.diariovoz.theme.PinkDark
 import com.integradora.diariovoz.theme.PinkLight
+import com.integradora.diariovoz.ui.DoroButton
+import kotlinx.coroutines.delay
 
 @Composable
 fun LoginScreen(
@@ -33,10 +36,6 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
-
-    // -------------------------------
-    // CONFIGURAR EXOPLAYER (NO SE MODIFICÓ)
-    // -------------------------------
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
             val mediaItem =
@@ -49,22 +48,18 @@ fun LoginScreen(
         }
     }
 
-    // Mute / Unmute dinámico
     LaunchedEffect(state.isMuted) {
         exoPlayer.volume = if (state.isMuted) 0f else 0.4f
     }
 
-    // Reproducir o pausar si VM lo pide
     LaunchedEffect(state.isPlaying) {
         exoPlayer.playWhenReady = state.isPlaying
     }
 
-    // Iniciar música al entrar
     LaunchedEffect(Unit) {
         viewModel.setPlaying(true)
     }
 
-    // Liberar player al salir
     DisposableEffect(Unit) {
         onDispose {
             exoPlayer.stop()
@@ -72,19 +67,21 @@ fun LoginScreen(
         }
     }
 
-    // Navegación al iniciar sesión
     LaunchedEffect(state.loginSuccess) {
         if (state.loginSuccess) {
-            exoPlayer.stop()
-            exoPlayer.release()
+
+            try {
+                exoPlayer.stop()
+                exoPlayer.release()
+            } catch (_: Exception) {}
+
+            delay(200)
+
             viewModel.clearAuthFlags()
             onLoginSuccess()
         }
     }
 
-    // -------------------------------------
-    //               UI
-    // -------------------------------------
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -94,7 +91,6 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // LOGO
         val logoResId = try {
             R.drawable.doro
         } catch (e: Resources.NotFoundException) {
@@ -117,11 +113,10 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // NOMBRE
         OutlinedTextField(
             value = state.nombre,
             onValueChange = { viewModel.onNombreChange(it) },
-            label = { Text("Nombre") },
+            label = { Text("Correo") },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = PinkDark,
                 unfocusedBorderColor = PinkLight
@@ -131,7 +126,6 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // CONTRASEÑA
         OutlinedTextField(
             value = state.password,
             onValueChange = { viewModel.onPasswordChange(it) },
@@ -140,48 +134,39 @@ fun LoginScreen(
                 focusedBorderColor = PinkDark,
                 unfocusedBorderColor = PinkLight
             ),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation()
         )
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // -----------------------
-        // BOTÓN LOGIN + MUTE
-        // -----------------------
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
-                onClick = {
-                    // **CORREGIDO**
-                    viewModel.login(context)
-                },
+            DoroButton(
+                text = "Iniciar Sesión",
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(Icons.Default.Login, contentDescription = "login")
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Iniciar Sesión")
+                viewModel.login(context)
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             IconButton(onClick = { viewModel.toggleMute() }) {
-                if (state.isMuted) {
+                if (state.isMuted)
                     Icon(Icons.Default.VolumeOff, contentDescription = "Unmute")
-                } else {
+                else
                     Icon(Icons.Default.VolumeUp, contentDescription = "Mute")
-                }
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         TextButton(onClick = onRegistrarClick) {
             Text("Registrarse")
         }
 
-        // Mensajes desde ViewModel
         state.message?.let { msg ->
             Spacer(modifier = Modifier.height(12.dp))
             Text(msg, style = MaterialTheme.typography.bodyMedium)

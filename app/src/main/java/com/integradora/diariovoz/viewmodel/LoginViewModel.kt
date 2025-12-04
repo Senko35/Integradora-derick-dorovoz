@@ -3,8 +3,9 @@ package com.integradora.diariovoz.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.integradora.diariovoz.data.UserPreferences
+import com.integradora.diariovoz.data.AppDatabase
 import com.integradora.diariovoz.data.User
+import com.integradora.diariovoz.session.LoginSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,10 +26,6 @@ class LoginViewModel : ViewModel() {
 
     private val _state = MutableStateFlow(LoginState())
     val state: StateFlow<LoginState> = _state
-
-    // --------------------------
-    // INPUT (NO TOCAR)
-    // --------------------------
     fun onNombreChange(newValue: String) {
         _state.value = _state.value.copy(nombre = newValue)
     }
@@ -36,10 +33,6 @@ class LoginViewModel : ViewModel() {
     fun onPasswordChange(newValue: String) {
         _state.value = _state.value.copy(password = newValue)
     }
-
-    // --------------------------
-    // AUDIO (NO TOCAR)
-    // --------------------------
     fun toggleMute() {
         _state.value = _state.value.copy(isMuted = !_state.value.isMuted)
     }
@@ -48,54 +41,59 @@ class LoginViewModel : ViewModel() {
         _state.value = _state.value.copy(isPlaying = isPlaying)
     }
 
-    // --------------------------
-    // REGISTRAR → ahora guarda en ROOM
-    // --------------------------
-    fun registrar(context: Context, nameOrEmail: String, pass: String) {
-        if (nameOrEmail.isBlank() || pass.isBlank()) {
+    fun registrar(context: Context, email: String, pass: String) {
+
+        if (email.isBlank() || pass.isBlank()) {
             showMessage("Por favor llena todos los campos.")
             return
         }
 
         viewModelScope.launch {
-            val userPrefs = UserPreferences(context)
 
-            if (userPrefs.userExists(nameOrEmail)) {
+            val dao = AppDatabase.getInstance(context).userDao()
+
+            // ¿Existe ya?
+            val existingUser = dao.getUserByEmail(email)
+            if (existingUser != null) {
                 showMessage("El usuario ya existe.")
                 return@launch
             }
 
-            userPrefs.saveUser(nameOrEmail, nameOrEmail, pass)
+            // Crear usuario
+            val newUser = User(
+                email = email,
+                password = pass
+            )
+
+            dao.insert(newUser)
 
             _state.value = _state.value.copy(registerSuccess = true)
             showMessage("Usuario registrado correctamente.")
         }
     }
-
-    // --------------------------
-    // LOGIN → ahora valida en ROOM
-    // --------------------------
     fun login(context: Context) {
-        val name = state.value.nombre
-        val pass = state.value.password
+        val email = _state.value.nombre
+        val pass = _state.value.password
 
-        if (name.isBlank() || pass.isBlank()) {
+        if (email.isBlank() || pass.isBlank()) {
             showMessage("Por favor llena todos los campos.")
             return
         }
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true)
-            delay(800)
 
-            val userPrefs = UserPreferences(context)
-            val user = userPrefs.getUser(name)
+            _state.value = _state.value.copy(isLoading = true)
+            delay(500) // pequeña animación
+
+            val dao = AppDatabase.getInstance(context).userDao()
+            val user = dao.getUserByEmail(email)
 
             if (user != null && user.password == pass) {
+                LoginSession.currentUserEmail = email
                 showMessage("Inicio de sesión exitoso.")
                 _state.value = _state.value.copy(
-                    isPlaying = false,
-                    loginSuccess = true
+                    loginSuccess = true,
+                    isPlaying = false
                 )
             } else {
                 showMessage("Credenciales incorrectas.")
@@ -104,10 +102,6 @@ class LoginViewModel : ViewModel() {
             _state.value = _state.value.copy(isLoading = false)
         }
     }
-
-    // --------------------------
-    // UTILES (NO TOCAR)
-    // --------------------------
     private fun showMessage(msg: String) {
         _state.value = _state.value.copy(message = msg)
     }
@@ -117,6 +111,9 @@ class LoginViewModel : ViewModel() {
     }
 
     fun clearAuthFlags() {
-        _state.value = _state.value.copy(loginSuccess = false, registerSuccess = false)
+        _state.value = _state.value.copy(
+            loginSuccess = false,
+            registerSuccess = false
+        )
     }
 }

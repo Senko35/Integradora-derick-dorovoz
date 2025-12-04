@@ -1,14 +1,20 @@
 package com.integradora.diariovoz.viewmodel
 
+import android.content.Context
 import android.media.MediaRecorder
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.integradora.diariovoz.data.AppDatabase
+import com.integradora.diariovoz.data.AudioEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import java.io.File
 
 data class AudioRecordState(
     val isRecording: Boolean = false,
-    val filePath: String? = null
+    val filePath: String? = null,
+    val audioSaved: Boolean = false
 )
 
 class AudioRecordViewModel : ViewModel() {
@@ -18,11 +24,9 @@ class AudioRecordViewModel : ViewModel() {
 
     private var recorder: MediaRecorder? = null
 
-    // -----------------------------
-    // INICIAR GRABACIÓN
-    // -----------------------------
+
     fun startRecording(outputFile: File) {
-        stopRecording() // por si había algo previo
+        stopRecording()
 
         try {
             recorder = MediaRecorder().apply {
@@ -39,21 +43,20 @@ class AudioRecordViewModel : ViewModel() {
 
             _state.value = AudioRecordState(
                 isRecording = true,
-                filePath = outputFile.absolutePath
+                filePath = outputFile.absolutePath,
+                audioSaved = false
             )
 
         } catch (e: Exception) {
             _state.value = AudioRecordState(
                 isRecording = false,
-                filePath = null
+                filePath = null,
+                audioSaved = false
             )
             e.printStackTrace()
         }
     }
 
-    // -----------------------------
-    // DETENER GRABACIÓN
-    // -----------------------------
     fun stopRecording() {
         try {
             recorder?.apply {
@@ -62,7 +65,7 @@ class AudioRecordViewModel : ViewModel() {
                 release()
             }
         } catch (_: Exception) {
-            // Si se intenta detener sin grabar, ignoramos error
+
         }
 
         recorder = null
@@ -72,7 +75,29 @@ class AudioRecordViewModel : ViewModel() {
         )
     }
 
-    // Se ejecuta cuando Compose destruye la pantalla
+    fun saveAudio(context: Context, userEmail: String) {
+        val path = _state.value.filePath ?: return
+        val file = File(path)
+
+        if (!file.exists()) return
+
+        viewModelScope.launch {
+            val dao = AppDatabase.getInstance(context).audioDao()
+
+            val audio = AudioEntity(
+                fileName = file.name,
+                filePath = file.absolutePath,
+                date = System.currentTimeMillis(),
+                userEmail = userEmail
+            )
+
+            dao.insert(audio)
+        }
+
+        _state.value = _state.value.copy(audioSaved = true)
+    }
+
+
     override fun onCleared() {
         super.onCleared()
         stopRecording()
