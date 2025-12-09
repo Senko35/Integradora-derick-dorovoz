@@ -1,12 +1,12 @@
 package com.integradora.diariovoz.data.api
 
-import com.integradora.diariovoz.data.AudioEntity
 import com.integradora.diariovoz.data.User
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -15,6 +15,7 @@ data class LoginRequest(val email: String, val password: String)
 data class LoginResponse(val message: String, val name: String, val email: String)
 data class RegisterResponse(val message: String, val user: User)
 data class AudioRequest(val fileName: String, val filePath: String, val date: Long, val userEmail: String)
+data class AudioRenameRequest(val userEmail: String, val currentFileName: String, val newFileName: String)
 data class SimpleResponse(val message: String)
 
 interface ApiService {
@@ -36,4 +37,7 @@ interface ApiService {
         @Query("fileName") fileName: String, 
         @Query("userEmail") userEmail: String
     ): Response<SimpleResponse>
+
+    @PUT("audios")
+    suspend fun renameAudio(@Body renameData: AudioRenameRequest): Response<SimpleResponse>
 }

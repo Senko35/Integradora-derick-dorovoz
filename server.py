@@ -27,6 +27,11 @@ class AudioItem(BaseModel):
     date: int
     userEmail: str
 
+class AudioRename(BaseModel):
+    userEmail: str
+    currentFileName: str
+    newFileName: str
+
 # --- Endpoints ---
 
 @app.get("/")
@@ -79,7 +84,7 @@ def get_audios(user_email: str):
     print(f"Se encontraron {len(user_audios)} audios")
     return user_audios
 
-# 5. Eliminar un audio (NUEVO)
+# 5. Eliminar un audio
 @app.delete("/audios")
 def delete_audio(fileName: str, userEmail: str):
     global audios_db
@@ -96,10 +101,30 @@ def delete_audio(fileName: str, userEmail: str):
         print(f"Error: Audio no encontrado para eliminar.")
         raise HTTPException(status_code=404, detail="Audio no encontrado")
 
+# 6. Renombrar un audio (NUEVO)
+@app.put("/audios")
+def rename_audio(rename_data: AudioRename):
+    print(f"--> RENAME AUDIO: {rename_data.currentFileName} a {rename_data.newFileName} ({rename_data.userEmail})")
+    
+    found = False
+    for a in audios_db:
+        if a['userEmail'] == rename_data.userEmail and a['fileName'] == rename_data.currentFileName:
+            a['fileName'] = rename_data.newFileName
+            found = True
+            break
+            
+    if found:
+        print(f"Audio renombrado exitosamente.")
+        print(f"DB Audios actual: {audios_db}")
+        return {"message": "Audio renombrado correctamente"}
+    else:
+        print(f"Error: Audio no encontrado para renombrar.")
+        raise HTTPException(status_code=404, detail="Audio no encontrado")
+
 if __name__ == "__main__":
     # Ejecuta el servidor en localhost:8000
     # Para acceder desde el emulador de Android, usa la IP 10.0.2.2 en lugar de localhost
-    print("--- SERVIDOR DIARIOVOZ ACTUALIZADO ---")
+    print("--- SERVIDOR DIARIOVOZ: VERSION FINAL - RENAME ACTIVO ---")
     print("Iniciando en puerto 8000...")
     # Nota: Si modificas el código, debes detener y volver a ejecutar el script para ver los cambios
     uvicorn.run(app, host="0.0.0.0", port=8000)

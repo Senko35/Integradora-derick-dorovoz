@@ -5,6 +5,7 @@ import android.media.MediaPlayer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.integradora.diariovoz.data.AudioEntity
+import com.integradora.diariovoz.data.api.AudioRenameRequest
 import com.integradora.diariovoz.data.api.RetrofitClient
 import com.integradora.diariovoz.session.LoginSession
 import kotlinx.coroutines.delay
@@ -169,6 +170,32 @@ class AudioListViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Error de conexión al eliminar")
+            }
+        }
+    }
+
+    fun renameAudio(context: Context, audio: AudioEntity, newName: String) {
+        if (newName.isBlank()) return
+
+        viewModelScope.launch {
+            try {
+                val renameRequest = AudioRenameRequest(
+                    userEmail = audio.userEmail,
+                    currentFileName = audio.fileName,
+                    newFileName = newName
+                )
+
+                val response = RetrofitClient.instance.renameAudio(renameRequest)
+
+                if (response.isSuccessful) {
+                    // Recargar lista para ver el cambio
+                    loadAudios(context)
+                } else {
+                    _state.value = _state.value.copy(error = "No se pudo renombrar el audio")
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error de conexión al renombrar")
+                e.printStackTrace()
             }
         }
     }

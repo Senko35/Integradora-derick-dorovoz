@@ -1,11 +1,10 @@
 package com.integradora.diariovoz.screens
 
-import android.media.MediaPlayer
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
@@ -31,12 +30,28 @@ fun AudioListScreen(
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
 
+    // Estados para controlar el diálogo de renombrar
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var audioToRename by remember { mutableStateOf<AudioEntity?>(null) }
+
     LaunchedEffect(Unit) { viewModel.loadAudios(context) }
+
+    // Si la bandera está activa, mostramos el diálogo
+    if (showRenameDialog && audioToRename != null) {
+        RenameAudioDialog(
+            currentName = audioToRename!!.fileName,
+            onDismiss = { showRenameDialog = false },
+            onConfirm = { newName ->
+                viewModel.renameAudio(context, audioToRename!!, newName)
+                showRenameDialog = false
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFFE4EC)) //
+            .background(Color(0xFFFFE4EC))
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -54,6 +69,10 @@ fun AudioListScreen(
             color = Color(0xFFAD1457) // rosa fuerte
         )
 
+        if (state.error != null) {
+            Text(text = state.error!!, color = Color.Red, modifier = Modifier.padding(8.dp))
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
 
         state.audios.forEach { audio ->
@@ -64,7 +83,11 @@ fun AudioListScreen(
                 progress = if (state.currentPlayingId == audio.id) state.progress else 0f,
                 onTogglePlay = { viewModel.togglePlay(audio) },
                 onSeek = { viewModel.seekTo(it) },
-                onDelete = { viewModel.deleteAudio(context, audio) }
+                onDelete = { viewModel.deleteAudio(context, audio) },
+                onRename = {
+                    audioToRename = audio
+                    showRenameDialog = true
+                }
             )
         }
     }
@@ -78,7 +101,8 @@ fun AudioItem(
     progress: Float,
     onTogglePlay: () -> Unit,
     onSeek: (Float) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onRename: () -> Unit // Nuevo callback
 ) {
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
 
@@ -93,13 +117,29 @@ fun AudioItem(
 
         Column(modifier = Modifier.padding(16.dp)) {
 
-            // TÍTULO + FECHA
-            Text(audio.fileName, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = dateFormat.format(Date(audio.date)),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(audio.fileName, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = dateFormat.format(Date(audio.date)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
+                
+                // Botón de editar nombre (lápiz)
+                IconButton(onClick = onRename) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Renombrar",
+                        tint = Color(0xFFAD1457)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -109,7 +149,7 @@ fun AudioItem(
                     Icon(
                         imageVector = if (isCurrent && isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = Color(0xFFAD1457) // rosa fuerte
+                        tint = Color(0xFFAD1457)
                     )
                 }
 
@@ -135,4 +175,38 @@ fun AudioItem(
             }
         }
     }
+}
+
+@Composable
+fun RenameAudioDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(currentName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Renombrar grabación") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Nuevo nombre") }
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(text) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFAD1457))
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
