@@ -4,8 +4,8 @@ import android.content.Context
 import android.media.MediaRecorder
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.integradora.diariovoz.data.AppDatabase
-import com.integradora.diariovoz.data.AudioEntity
+import com.integradora.diariovoz.data.api.AudioRequest
+import com.integradora.diariovoz.data.api.RetrofitClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -82,19 +82,29 @@ class AudioRecordViewModel : ViewModel() {
         if (!file.exists()) return
 
         viewModelScope.launch {
-            val dao = AppDatabase.getInstance(context).audioDao()
+            try {
+                // Preparar objeto para enviar
+                val audioRequest = AudioRequest(
+                    fileName = file.name,
+                    filePath = file.absolutePath,
+                    date = System.currentTimeMillis(),
+                    userEmail = userEmail
+                )
 
-            val audio = AudioEntity(
-                fileName = file.name,
-                filePath = file.absolutePath,
-                date = System.currentTimeMillis(),
-                userEmail = userEmail
-            )
+                // Llamada a Retrofit
+                val response = RetrofitClient.instance.saveAudio(audioRequest)
 
-            dao.insert(audio)
+                if (response.isSuccessful) {
+                     _state.value = _state.value.copy(audioSaved = true)
+                } else {
+                    // Manejar error (opcional: mostrar mensaje)
+                    println("Error guardando audio: ${response.code()}")
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
-
-        _state.value = _state.value.copy(audioSaved = true)
     }
 
 

@@ -70,7 +70,9 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 
-
+    // --- Retrofit ---
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
 
     // --- Otros ---
     implementation("androidx.work:work-runtime-ktx:2.9.0")

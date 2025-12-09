@@ -4,8 +4,8 @@ import android.content.Context
 import android.media.MediaPlayer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.integradora.diariovoz.data.AppDatabase
 import com.integradora.diariovoz.data.AudioEntity
+import com.integradora.diariovoz.data.api.RetrofitClient
 import com.integradora.diariovoz.session.LoginSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +17,9 @@ data class AudioListState(
     val currentPlayingId: Int? = null,
     val isPlaying: Boolean = false,
     val progress: Float = 0f,
-    val duration: Int = 0
+    val duration: Int = 0,
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
 class AudioListViewModel : ViewModel() {
@@ -30,16 +32,46 @@ class AudioListViewModel : ViewModel() {
 
     fun loadAudios(context: Context) {
         viewModelScope.launch {
-            val dao = AppDatabase.getInstance(context).audioDao()
-            val list = dao.getAudiosByUser(LoginSession.currentUserEmail)
-            _state.value = _state.value.copy(audios = list)
+            _state.value = _state.value.copy(isLoading = true, error = null)
+            
+            try {
+                val email = LoginSession.currentUserEmail
+                if (email.isEmpty()) {
+                    // Si no hay usuario logueado, no cargamos nada
+                    _state.value = _state.value.copy(isLoading = false)
+                    return@launch
+                }
+
+                val response = RetrofitClient.instance.getAudios(email)
+                
+                if (response.isSuccessful && response.body() != null) {
+                    val apiList = response.body()!!
+                    
+                    // Mapeamos de AudioRequest (DTO) a AudioEntity (Modelo de UI)
+                    // Usamos hashCode del nombre como ID temporal para la UI
+                    val entityList = apiList.map { dto ->
+                        AudioEntity(
+                            id = dto.fileName.hashCode(),
+                            fileName = dto.fileName,
+                            filePath = dto.filePath,
+                            date = dto.date,
+                            userEmail = dto.userEmail
+                        )
+                    }
+                    
+                    _state.value = _state.value.copy(audios = entityList, isLoading = false)
+                } else {
+                    _state.value = _state.value.copy(isLoading = false, error = "Error al cargar audios")
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(isLoading = false, error = "Fallo de conexión: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
 
     fun togglePlay(audio: AudioEntity) {
-
-
         if (_state.value.currentPlayingId == audio.id) {
             if (_state.value.isPlaying) {
                 pause()
@@ -112,7 +144,6 @@ class AudioListViewModel : ViewModel() {
 
     fun deleteAudio(context: Context, audio: AudioEntity) {
         viewModelScope.launch {
-
             // Si se elimina el audio que está sonando → detenerlo
             if (_state.value.currentPlayingId == audio.id) {
                 mediaPlayer?.stop()
@@ -126,13 +157,19 @@ class AudioListViewModel : ViewModel() {
                 )
             }
 
-
-            val dao = AppDatabase.getInstance(context).audioDao()
-            dao.deleteAudio(audio)
-
-            // Recargar lista
-            val list = dao.getAudiosByUser(LoginSession.currentUserEmail)
-            _state.value = _state.value.copy(audios = list)
+            try {
+                // Llamada a la API para eliminar
+                val response = RetrofitClient.instance.deleteAudio(audio.fileName, audio.userEmail)
+                
+                if (response.isSuccessful) {
+                    // Recargar lista desde el servidor
+                    loadAudios(context)
+                } else {
+                    _state.value = _state.value.copy(error = "No se pudo eliminar el audio")
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error de conexión al eliminar")
+            }
         }
     }
 

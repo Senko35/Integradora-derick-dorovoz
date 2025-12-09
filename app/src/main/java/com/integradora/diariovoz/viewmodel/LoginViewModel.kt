@@ -3,8 +3,8 @@ package com.integradora.diariovoz.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.integradora.diariovoz.data.AppDatabase
-import com.integradora.diariovoz.data.User
+import com.integradora.diariovoz.data.api.LoginRequest
+import com.integradora.diariovoz.data.api.RetrofitClient
 import com.integradora.diariovoz.session.LoginSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,36 +41,6 @@ class LoginViewModel : ViewModel() {
         _state.value = _state.value.copy(isPlaying = isPlaying)
     }
 
-    fun registrar(context: Context, email: String, pass: String) {
-
-        if (email.isBlank() || pass.isBlank()) {
-            showMessage("Por favor llena todos los campos.")
-            return
-        }
-
-        viewModelScope.launch {
-
-            val dao = AppDatabase.getInstance(context).userDao()
-
-            // ¿Existe ya?
-            val existingUser = dao.getUserByEmail(email)
-            if (existingUser != null) {
-                showMessage("El usuario ya existe.")
-                return@launch
-            }
-
-            // Crear usuario
-            val newUser = User(
-                email = email,
-                password = pass
-            )
-
-            dao.insert(newUser)
-
-            _state.value = _state.value.copy(registerSuccess = true)
-            showMessage("Usuario registrado correctamente.")
-        }
-    }
     fun login(context: Context) {
         val email = _state.value.nombre
         val pass = _state.value.password
@@ -83,23 +53,37 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
 
             _state.value = _state.value.copy(isLoading = true)
-            delay(500) // pequeña animación
+            // delay(500) // Animación (opcional si la red es rápida)
 
-            val dao = AppDatabase.getInstance(context).userDao()
-            val user = dao.getUserByEmail(email)
+            try {
+                // Crear objeto de petición
+                val loginRequest = LoginRequest(email = email, password = pass)
 
-            if (user != null && user.password == pass) {
-                LoginSession.currentUserEmail = email
-                showMessage("Inicio de sesión exitoso.")
-                _state.value = _state.value.copy(
-                    loginSuccess = true,
-                    isPlaying = false
-                )
-            } else {
-                showMessage("Credenciales incorrectas.")
+                // Llamada a Retrofit
+                val response = RetrofitClient.instance.login(loginRequest)
+
+                if (response.isSuccessful && response.body() != null) {
+                    val body = response.body()!!
+                    
+                    // Guardar sesión
+                    LoginSession.currentUserEmail = body.email
+                    // Podrías guardar también el nombre: body.name
+                    
+                    showMessage("Inicio de sesión exitoso. Hola ${body.name}")
+                    _state.value = _state.value.copy(
+                        loginSuccess = true,
+                        isPlaying = false
+                    )
+                } else {
+                    // Error credenciales (401) u otro
+                    showMessage("Credenciales incorrectas o error en servidor.")
+                }
+
+            } catch (e: Exception) {
+                showMessage("Error de conexión: ${e.message}")
+            } finally {
+                _state.value = _state.value.copy(isLoading = false)
             }
-
-            _state.value = _state.value.copy(isLoading = false)
         }
     }
     private fun showMessage(msg: String) {

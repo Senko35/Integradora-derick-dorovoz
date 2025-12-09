@@ -3,8 +3,8 @@ package com.integradora.diariovoz.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.integradora.diariovoz.data.AppDatabase
 import com.integradora.diariovoz.data.User
+import com.integradora.diariovoz.data.api.RetrofitClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -36,29 +36,37 @@ class RegisterViewModel : ViewModel() {
 
             _state.value = _state.value.copy(isLoading = true)
 
-            val dao = AppDatabase.getInstance(context).userDao()
+            try {
+                // Crear objeto de usuario para el servidor
+                val newUser = User(
+                    name = name,
+                    email = email,
+                    password = pass
+                )
 
-            // Verificar si ya existe un usuario con ese email
-            val exists = dao.getUserByEmail(email) != null
-            if (exists) {
-                sendMessage("El correo ya está registrado")
-                _state.value = _state.value.copy(isLoading = false)
-                return@launch
+                // LLamada a la API con Retrofit
+                val response = RetrofitClient.instance.register(newUser)
+
+                if (response.isSuccessful) {
+                    _state.value = RegisterState(
+                        isLoading = false,
+                        message = "Registro exitoso",
+                        success = true
+                    )
+                } else {
+                    // El servidor devolvió un error (ej: usuario ya existe)
+                    sendMessage("Error: ${response.code()} - Posiblemente el correo ya existe")
+                }
+
+            } catch (e: Exception) {
+                // Error de conexión
+                sendMessage("Error de conexión: ${e.message}")
+            } finally {
+                 // Asegurarnos de quitar el loading si no fue éxito
+                 if(!_state.value.success){
+                     _state.value = _state.value.copy(isLoading = false)
+                 }
             }
-
-            val newUser = User(
-                name = name,
-                email = email,
-                password = pass
-            )
-
-            dao.insert(newUser)
-
-            _state.value = RegisterState(
-                isLoading = false,
-                message = "Registro exitoso",
-                success = true
-            )
         }
     }
 
